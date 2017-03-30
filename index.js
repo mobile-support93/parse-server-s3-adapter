@@ -32,8 +32,6 @@ function S3Adapter() {
     s3Options.secretAccessKey = options.secretKey;
   }
 
-  Object.assign(s3Options, options.s3overrides);
-
   this._s3Client = new AWS.S3(s3Options);
   this._hasBucket = false;
 }
@@ -43,7 +41,7 @@ S3Adapter.prototype.createBucket = function() {
   if (this._hasBucket) {
     promise = Promise.resolve();
   } else {
-    promise = new Promise((resolve) => {
+    promise = new Promise((resolve, reject) => {
       this._s3Client.createBucket(() => {
         this._hasBucket = true;
         resolve();
@@ -60,11 +58,19 @@ S3Adapter.prototype.createFile = function(filename, data, contentType) {
     Key: this._bucketPrefix + filename,
     Body: data
   };
+  var fileExt = filename.split('.').pop();
+  console.log("FILEEXT: "+fileExt);
+  if(fileExt!='jpeg' && fileExt!='jpg' && fileExt!='pdf'){
+        console.log("FILE EXTENTION OTHER THAN JPG, JPEG OR PDF");
+        return;
+  }
   if (this._directAccess) {
     params.ACL = "public-read"
   }
   if (contentType) {
-    params.ContentType = contentType;
+    console.log("CONTENT TYPE GIVEN: "+contentType);
+    if(contentType=='image/jpeg' || contentType=='application/pdf')
+      params.ContentType = contentType;
   }
   if(this._globalCacheControl) {
     params.CacheControl = this._globalCacheControl;
@@ -120,17 +126,27 @@ S3Adapter.prototype.getFileData = function(filename) {
 // Generates and returns the location of a file stored in S3 for the given request and filename
 // The location is the direct S3 link if the option is set, otherwise we serve the file through parse-server
 S3Adapter.prototype.getFileLocation = function(config, filename) {
-  filename = encodeURIComponent(filename);
   if (this._directAccess) {
     if (this._baseUrl && this._baseUrlDirect) {
       return `${this._baseUrl}/${filename}`;
     } else if (this._baseUrl) {
       return `${this._baseUrl}/${this._bucketPrefix + filename}`;
     } else {
-      return `https://${this._bucket}.s3.amazonaws.com/${this._bucketPrefix + filename}`;
+        return `https://${this._bucket}.s3.amazonaws.com/${this._bucketPrefix + filename}`;
+  /* var options = optionsFromArguments(arguments);
+        var params = {Bucket: options.bucket, Key: filename, Expires: 60};
+        var signedUrl = this._s3Client.getSignedUrl('getObject', params);
+        console.log("S3 SIGNED URL: "+signedUrl);
+        return signedUrl; */
     }
   }
-  return (config.mount + '/files/' + config.applicationId + '/' + filename);
+
+  var options = optionsFromArguments(arguments);
+  var params = {Bucket: options.bucket, Key: filename, Expires: 60};
+  var signedUrl = this._s3Client.getSignedUrl('getObject', params);
+  console.log("S3 SIGNED URL: "+signedUrl);
+  return signedUrl;
+  //return (config.mount + '/files/' + config.applicationId + '/' + encodeURIComponent(filename));
 }
 
 module.exports = S3Adapter;
