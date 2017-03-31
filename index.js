@@ -62,7 +62,10 @@ S3Adapter.prototype.createFile = function(filename, data, contentType) {
   console.log("FILEEXT: "+fileExt);
   if(fileExt!='jpeg' && fileExt!='jpg' && fileExt!='pdf'){
         console.log("FILE EXTENTION OTHER THAN JPG, JPEG OR PDF");
-        return;
+        return new Promise(function(resolve,reject){
+                reject("Cannot upload file other than JPG, JPEG or PDF");
+        });
+
   }
   if (this._directAccess) {
     params.ACL = "public-read"
